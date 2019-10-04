@@ -44,6 +44,7 @@ def restart():
 try: #importing dependencies (stolen from RTB lol)
     import discord
     from discord.ext import commands
+    import glob
 except Exception as i:
     try:
         window.Close()
@@ -79,6 +80,7 @@ def configsetup():
     print("=================================================")
     configstp["token"] = "NotSet"
     configstp["prefix"] = "NotSet"
+    configstp["password"] = "NotSet"
     while configstp["token"] == "NotSet":
         configstp["token"] = input("Enter your token without quotes: ")
         if configstp["token"] == "":
@@ -92,6 +94,13 @@ def configsetup():
             print("You didn't enter anything :/")
             configstp["prefix"] = "NotSet"
             print("")
+    print("")
+    while configstp["password"] == "NotSet":
+        configstp["password"] = input("And finally, enter your password: ")
+        if configstp["password"] == "":
+            print("You didn't enter anything :/")
+            configstp["password"] = "NotSet"
+            print("")
     with open('config.json', encoding='utf-8', mode="w") as n:
         dump(configstp, n, sort_keys=True, indent=4)
     restart()
@@ -103,6 +112,7 @@ try: #import the config RTB style
         config = json.load(handle)
         token = config['token']
         prefix = config['prefix']
+        password = config['password']
 except Exception as e:
     if type(e) is FileNotFoundError:
         configsetup()
@@ -111,6 +121,18 @@ except Exception as e:
         print("Make sure it is valid")
         print("Error was : " + str(e))
 bot = commands.Bot(command_prefix=config['prefix'], description='''Amadeus Selfbot by Mattlau04''', self_bot=True)
+#Defining variables for the cogs
+bot.password = password
+
+#Listing cogs
+coglist = []
+for extension in os.listdir("cogs"):
+    if extension.endswith('.py'):
+        coglist.append(extension[:-3])
+
+#Loading cogs
+for cog in coglist:
+    bot.load_extension("Cogs." + cog)
 
 @bot.event
 async def on_ready():
@@ -128,27 +150,46 @@ async def reload(ctx):
     '''
     Reload Amadeus
     '''
+    await ctx.message.delete()
     if ctx.message.author.id == bot.user.id:
         await ctx.send("`Reloading...`", delete_after=3)
         restart()
 
 @bot.command()
-async def ping(ctx):
+async def reloadcogs(ctx):
     '''
-    Pong! Get the bot latency with this command.
+    Reload all cogs
     '''
-
-    latency = bot.latency
-    await ctx.send("Pong! `" + str(int(latency * 100)) + "ms`")
+    try:
+        await ctx.message.delete()
+    except Exception:
+        pass
+    if ctx.message.author.id == bot.user.id:
+        await ctx.send("`Reloading cogs...`", delete_after=3)
+        for cog in coglist:
+            try:
+                bot.unload_extension("Cogs." + cog)
+            except Exception as m:
+                print("error while unloadin cogs: " + str(m))
+                pass
+        for cog in coglist:
+            try:
+                bot.load_extension("Cogs." + cog)
+            except Exception as m:
+                print("error while loading cogs: " + str(m))
+                pass
+        await ctx.send("`Reloaded cogs!`", delete_after=3)
 
 @bot.command()
 async def prefix(ctx, content:str):
     '''
     Changes Amadeus prefix
     '''
+    await ctx.message.delete()
     newprefix = str(content)
     configstp = {}
     configstp["token"] = config["token"]
+    configstp["password"] = config["password"]
     configstp["prefix"] = newprefix
     with open('config.json', encoding='utf-8', mode="w") as n:
         dump(configstp, n, sort_keys=True, indent=4)
@@ -175,6 +216,7 @@ except Exception as t:
         configstp = {}
         configstp["token"] = config["token"]
         configstp["prefix"] = prefix
+        configstp["password"] = password
         with open('config.json', encoding='utf-8', mode="w") as n:
             dump(configstp, n, sort_keys=True, indent=4)
         restart()
